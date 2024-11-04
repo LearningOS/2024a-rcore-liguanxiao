@@ -1,26 +1,38 @@
 //! Implementation of [`PageTableEntry`] and [`PageTable`].
 
-use super::{frame_alloc, FrameTracker, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
+use super::{frame_alloc, FrameTracker, PhysPageNum, StepByOne, VirtAddr, VirtPageNum,PhysAddr};
 use alloc::vec;
 use alloc::vec::Vec;
 use bitflags::*;
+use crate::task::current_user_token;
+
 
 bitflags! {
     /// page table entry flags
     pub struct PTEFlags: u8 {
+        /// Valid flag, indicates whether the entry is valid.
         const V = 1 << 0;
+        /// Valid flag, indicates whether the entry is valid.
         const R = 1 << 1;
+        /// Valid flag, indicates whether the entry is valid.
         const W = 1 << 2;
+        /// Valid flag, indicates whether the entry is valid.
         const X = 1 << 3;
+        /// Valid flag, indicates whether the entry is valid.
         const U = 1 << 4;
+        /// Valid flag, indicates whether the entry is valid.
         const G = 1 << 5;
+        /// Valid flag, indicates whether the entry is valid.
         const A = 1 << 6;
+        /// Valid flag, indicates whether the entry is valid.
         const D = 1 << 7;
     }
 }
 
 #[derive(Copy, Clone)]
 #[repr(C)]
+#[derive(PartialEq)]
+#[derive(Debug)]
 /// page table entry structure
 pub struct PageTableEntry {
     /// bits of page table entry
@@ -171,3 +183,23 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
     }
     v
 }
+
+fn get_ppn(vpn: VirtPageNum) -> PhysPageNum{
+    let pgt:PageTable = PageTable::from_token(current_user_token());
+    pgt.translate(vpn).unwrap().ppn()
+}
+
+/// virtaddress_to_phyaddress
+pub fn virtaddress_to_phyaddress(token: usize) -> usize{
+    let virt_addr:VirtAddr = token.into();
+    let vpn:VirtPageNum;
+    let offset = virt_addr.page_offset();
+    if virt_addr.aligned(){
+        vpn = virt_addr.into();
+    }else {
+        vpn = virt_addr.floor();
+    }
+    let ppn = get_ppn(vpn);
+    let pd:PhysAddr = ppn.into();
+    pd.0 + offset
+} 

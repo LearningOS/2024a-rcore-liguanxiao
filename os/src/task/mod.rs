@@ -14,14 +14,15 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
+use crate::config::{MAX_SYSCALL_NUM};
 use crate::loader::{get_app_data, get_num_app};
+use crate::timer::{get_time_ms};
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
 use alloc::vec::Vec;
 use lazy_static::*;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
-
 pub use context::TaskContext;
 
 /// The task manager, where all the tasks are managed.
@@ -37,15 +38,15 @@ pub struct TaskManager {
     /// total number of tasks
     num_app: usize,
     /// use inner value to get mutable access
-    inner: UPSafeCell<TaskManagerInner>,
+    pub inner: UPSafeCell<TaskManagerInner>,
 }
 
 /// The task manager inner in 'UPSafeCell'
-struct TaskManagerInner {
+pub struct TaskManagerInner {
     /// task list
-    tasks: Vec<TaskControlBlock>,
+    pub tasks: Vec<TaskControlBlock>,
     /// id of current `Running` task
-    current_task: usize,
+    pub current_task: usize,
 }
 
 lazy_static! {
@@ -79,6 +80,9 @@ impl TaskManager {
         let mut inner = self.inner.exclusive_access();
         let next_task = &mut inner.tasks[0];
         next_task.task_status = TaskStatus::Running;
+        if next_task.first_time == 0 {
+            next_task.first_time = get_time_ms()
+        }
         let next_task_cx_ptr = &next_task.task_cx as *const TaskContext;
         drop(inner);
         let mut _unused = TaskContext::zero_init();
@@ -140,6 +144,9 @@ impl TaskManager {
             let mut inner = self.inner.exclusive_access();
             let current = inner.current_task;
             inner.tasks[next].task_status = TaskStatus::Running;
+            if inner.tasks[next].first_time == 0 {
+                inner.tasks[next].first_time = get_time_ms()
+            }
             inner.current_task = next;
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
             let next_task_cx_ptr = &inner.tasks[next].task_cx as *const TaskContext;
@@ -153,6 +160,19 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    fn count_task_syscall(&self,syscall_id: usize){
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].syscall_times[syscall_id] += 1;
+    }
+
+    fn find_running_task(&self) -> (TaskStatus, [u32; MAX_SYSCALL_NUM], usize){
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        (TaskStatus::Running, inner.tasks[current].syscall_times, inner.tasks[current].first_time)
+    }
+
 }
 
 /// Run the first task in task list.
@@ -202,3 +222,14 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
 }
+
+/// make the syscall_id to function to add 1
+pub fn count_and_run_syscall(syscall_id: usize){
+    TASK_MANAGER.count_task_syscall(syscall_id);
+}
+
+/// return the 
+pub fn get_running_task() -> (TaskStatus, [u32; MAX_SYSCALL_NUM], usize){
+    TASK_MANAGER.find_running_task()
+}
+
