@@ -4,23 +4,35 @@ use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 use bitflags::*;
+use crate::task::current_user_token;
+
+
 
 bitflags! {
     /// page table entry flags
     pub struct PTEFlags: u8 {
+        /// flag the funcitno
         const V = 1 << 0;
+        /// flag the funcitno
         const R = 1 << 1;
+        /// flag the fu
         const W = 1 << 2;
+        /// flag the fu
         const X = 1 << 3;
+        /// flag the func
         const U = 1 << 4;
+        /// flag the func
         const G = 1 << 5;
+        /// flag the func
         const A = 1 << 6;
+        /// flag the func
         const D = 1 << 7;
     }
 }
 
 #[derive(Copy, Clone)]
 #[repr(C)]
+#[derive(PartialEq)]
 /// page table entry structure
 pub struct PageTableEntry {
     /// bits of page table entry
@@ -213,3 +225,23 @@ pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
         .unwrap()
         .get_mut()
 }
+
+fn get_ppn(vpn: VirtPageNum) -> PhysPageNum{
+    let pgt:PageTable = PageTable::from_token(current_user_token());
+    pgt.translate(vpn).unwrap().ppn()
+}
+
+/// virtaddress_to_phyaddress
+pub fn virtaddress_to_phyaddress(token: usize) -> usize{
+    let virt_addr:VirtAddr = token.into();
+    let vpn:VirtPageNum;
+    let offset = virt_addr.page_offset();
+    if virt_addr.aligned(){
+        vpn = virt_addr.into();
+    }else {
+        vpn = virt_addr.floor();
+    }
+    let ppn = get_ppn(vpn);
+    let pd:PhysAddr = ppn.into();
+    pd.0 + offset
+} 
