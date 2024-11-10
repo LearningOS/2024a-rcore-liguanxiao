@@ -26,6 +26,7 @@ pub struct OSInode {
 pub struct OSInodeInner {
     offset: usize,
     inode: Arc<Inode>,
+    
 }
 
 impl OSInode {
@@ -155,4 +156,27 @@ impl File for OSInode {
         }
         total_write_size
     }
+}
+
+
+/// link 
+pub fn link_at(old_name:&str,new_name:&str)->isize{
+    if  old_name == new_name{
+        return -1;
+    }
+    ROOT_INODE.link_at(old_name,new_name);
+    0
+}
+/// unlink
+pub fn unlink_at(name:&str)->isize{
+    return ROOT_INODE.ulink(name);
+}
+/// get
+pub fn get_inode_id_from_name(name:&str)->u32{
+    return ROOT_INODE.get_inode_id_from_name(name);
+}
+/// fstat
+pub fn fstat(inode_id: u64)->(u64,bool,u32){
+    println!("step3");
+    return ROOT_INODE.fstat(inode_id);
 }

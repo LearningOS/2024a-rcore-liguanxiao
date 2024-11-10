@@ -11,7 +11,7 @@ use alloc::vec::Vec;
 use core::arch::asm;
 use lazy_static::*;
 use riscv::register::satp;
-
+use crate::task::{current_task,current_user_token};
 extern "C" {
     fn stext();
     fn etext();
@@ -464,4 +464,73 @@ pub fn remap_test() {
         .unwrap()
         .executable(),);
     println!("remap_test passed!");
+}
+
+/// push mmap
+pub fn push_mmap(start: usize, len: usize, port: usize)->isize{
+
+    if (port & !0x7 !=0) || (port & 0x7 == 0){
+        return -1;
+    }
+    let s_va:VirtAddr = VirtAddr::from(start);
+    if !s_va.aligned(){
+        return -1;
+    }
+    let mut p_move = port;
+    let mut permissions = MapPermission::empty();
+    if p_move&1 == 1 {
+        permissions.insert(MapPermission::R);
+    }
+    p_move>>=1;
+    if p_move&1 == 1 {
+        permissions.insert(MapPermission::W);
+    }
+    p_move>>=1;
+    if p_move&1 == 1 {
+        permissions.insert(MapPermission::X);
+    }
+    permissions.insert(MapPermission::U);
+    let new_map_area =  MapArea::new(
+        start.into(),
+        (start+len).into(),
+        MapType::Framed,
+        permissions
+    );
+    for m in new_map_area.vpn_range {
+        let pgt:PageTable = PageTable::from_token(current_user_token());
+        let pte=pgt.translate(m);
+        if pte!=None && pte!= core::prelude::v1::Some(PageTableEntry::empty()) {return -1;}
+    }
+    let binding = current_task().unwrap();
+    let mut inner = binding.inner_exclusive_access();
+    // let kernel_space = &mut inner.memory_set;
+    inner.memory_set.push(
+       new_map_area,
+       None
+    );
+    0
+}
+
+///del_munmap
+pub fn del_munmap(_start: usize, _len: usize)-> isize{
+    let s_va:VirtAddr = VirtAddr::from(_start);
+    let e_va:VirtAddr = VirtAddr::from(_start+_len);
+    if !s_va.aligned() || !e_va.aligned(){
+            return -1;
+    }
+    let mut new_map_area =  MapArea::new(
+        _start.into(),
+        (_start+_len).into(),
+        MapType::Framed,
+        MapPermission::U
+    );
+    for m in new_map_area.vpn_range {
+        let pgt:PageTable = PageTable::from_token(current_user_token());
+        let pte=pgt.translate(m);
+        if !(pte!=None&& pte!= Some(PageTableEntry::empty())) {return -1;}
+    }
+    let binding = current_task().unwrap();
+    let mut inner = binding.inner_exclusive_access();
+    new_map_area.unmap(&mut inner.memory_set.page_table);
+    0
 }

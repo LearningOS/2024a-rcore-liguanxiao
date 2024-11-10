@@ -39,6 +39,17 @@ impl File for Stdin {
     fn write(&self, _user_buf: UserBuffer) -> usize {
         panic!("Cannot write to stdin!");
     }
+//     fn fstat(&self, _name:&str) -> Option<(u64,bool,u32)>{
+//         None
+//    }
+//    /// link
+//    fn link_at(&self,_old_name:&str,_new_name:&str)->isize{
+//        0
+//    }
+//    /// unlink
+//    fn unlink_at(&self,_name:&str)->isize{
+//       return 0;
+//    }
 }
 
 impl File for Stdout {
@@ -57,4 +68,15 @@ impl File for Stdout {
         }
         user_buf.len()
     }
+    // fn fstat(&self, _name:&str) -> Option<(u64,bool,u32)>{
+    //      None
+    // }
+    // /// link
+    // fn link_at(&self,_old_name:&str,_new_name:&str)->isize{
+    //      0
+    // }
+    // /// unlink
+    // fn unlink_at(&self,_name:&str)->isize{
+    //    return 0;
+    // }
 }
