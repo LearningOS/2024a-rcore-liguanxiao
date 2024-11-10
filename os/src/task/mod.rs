@@ -204,3 +204,10 @@ pub fn remove_inactive_task(task: Arc<TaskControlBlock>) {
     trace!("kernel: remove_inactive_task .. remove_timer");
     remove_timer(Arc::clone(&task));
 }
+
+/// get current task
+pub fn current_get_task_id()->usize{
+    let task = current_task().unwrap();
+    let task_inner = task.inner_exclusive_access();
+    task_inner.get_t_id()
+}

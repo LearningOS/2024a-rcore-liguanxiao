@@ -4,6 +4,8 @@ use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 use bitflags::*;
+use crate::task::current_user_token;
+
 
 bitflags! {
     /// page table entry flags
@@ -21,6 +23,7 @@ bitflags! {
 
 #[derive(Copy, Clone)]
 #[repr(C)]
+#[derive(PartialEq)]
 /// page table entry structure
 pub struct PageTableEntry {
     /// bits of page table entry
@@ -274,3 +277,23 @@ impl Iterator for UserBufferIterator {
         }
     }
 }
+
+fn get_ppn(vpn: VirtPageNum) -> PhysPageNum{
+    let pgt:PageTable = PageTable::from_token(current_user_token());
+    pgt.translate(vpn).unwrap().ppn()
+}
+
+/// virtaddress_to_phyaddress
+pub fn virtaddress_to_phyaddress(token: usize) -> usize{
+    let virt_addr:VirtAddr = token.into();
+    let vpn:VirtPageNum;
+    let offset = virt_addr.page_offset();
+    if virt_addr.aligned(){
+        vpn = virt_addr.into();
+    }else {
+        vpn = virt_addr.floor();
+    }
+    let ppn = get_ppn(vpn);
+    let pd:PhysAddr = ppn.into();
+    pd.0 + offset
+} 
